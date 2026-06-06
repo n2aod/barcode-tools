@@ -1,0 +1,538 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>条码生成器</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --primary: #4f6ef7;
+    --primary-hover: #3b5de7;
+    --text: #1a1a2e;
+    --text-secondary: #6b7280;
+    --border: #e5e7eb;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+    --page-gutter: 16px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: block;
+    width: 100%;
+    padding: 24px var(--page-gutter) 40px;
+  }
+
+  .shell {
+    width: min(100%, 720px);
+    margin: 0 auto;
+  }
+
+  .too-small {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    text-align: center;
+    z-index: 999;
+  }
+
+  .too-small p {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+
+  body.is-mobile {
+    --page-gutter: 14px;
+  }
+
+  body.is-mobile .shell {
+    width: 100%;
+  }
+
+  body.is-mobile .card {
+    padding: 16px;
+    max-width: none;
+  }
+
+  body.is-mobile h1 {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+  }
+
+  body.is-mobile .tabs {
+    gap: 6px;
+  }
+
+  body.is-mobile .tab {
+    padding: 10px 4px;
+    font-size: 0.78rem;
+  }
+
+  body.is-mobile .result .preview {
+    min-height: 120px;
+    padding: 16px;
+  }
+
+  body.is-mobile .too-small {
+    padding: 20px;
+  }
+
+  body.is-too-small .shell {
+    display: none;
+  }
+
+  body.is-too-small .too-small {
+    display: flex;
+  }
+
+  body.show-pc-popup .pc-popup {
+    display: flex;
+  }
+
+  @media (max-width: 339px) {
+    .shell {
+      display: none;
+    }
+
+    .too-small {
+      display: flex;
+    }
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    width: 100%;
+    max-width: 720px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    width: 100%;
+    max-width: 720px;
+    padding: 24px;
+  }
+
+  .tool-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .controls {
+    width: 100%;
+  }
+
+  /* Tabs */
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 8px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab:hover { border-color: var(--primary); color: var(--primary); }
+  .tab.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+
+  /* Form */
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text);
+    background: #fff;
+    transition: border-color 0.2s;
+    outline: none;
+  }
+  .field input:focus, .field select:focus { border-color: var(--primary); }
+
+  .row {
+    display: flex;
+    gap: 12px;
+  }
+  .row .field { flex: 1; }
+
+  button.generate {
+    width: 100%;
+    padding: 14px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button.generate:hover { background: var(--primary-hover); }
+  button.generate:active { transform: scale(0.98); }
+
+  /* Result */
+  .result {
+    margin-top: 20px;
+    text-align: center;
+    display: none;
+    min-width: 0;
+  }
+  .result.show { display: block; }
+
+  .result .preview {
+    background: #fafbfc;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 120px;
+  }
+  .result .preview canvas,
+  .result .preview img,
+  .result .preview svg {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .error-msg {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-top: 8px;
+    display: none;
+  }
+  .error-msg.show { display: block; }
+
+  .hint {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .pc-popup {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(245, 247, 250, 0.82);
+    z-index: 1000;
+  }
+
+  .pc-popup-panel {
+    width: min(100%, 420px);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    padding: 20px;
+    text-align: center;
+  }
+
+  .pc-popup-panel h2 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+
+  .pc-popup-panel p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+
+  .pc-popup-panel button {
+    margin-top: 16px;
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="pc-popup" role="dialog" aria-modal="true" aria-labelledby="pc-popup-title">
+  <div class="pc-popup-panel">
+    <h2 id="pc-popup-title">识别您正在使用PC</h2>
+    <p>当前网页专为移动端优化，建议您使用移动端访问~</p>
+    <button type="button" id="pc-popup-close">知道了</button>
+  </div>
+</div>
+
+<div class="too-small" aria-live="polite" aria-atomic="true">
+  <p>窗口尺寸太小装不下啦！<br>请调整窗口大小~</p>
+</div>
+
+<main class="shell">
+  <h1>条码 / 二维码生成器</h1>
+
+  <div class="card">
+    <div class="tool-layout">
+      <div class="controls">
+        <div class="tabs">
+          <button class="tab active" data-type="code128">Code 128</button>
+          <button class="tab" data-type="ean13">EAN-13</button>
+          <button class="tab" data-type="qrcode">二维码</button>
+        </div>
+
+        <div class="field" id="field-content">
+          <label for="input-content">内容</label>
+          <input type="text" id="input-content" placeholder="请输入要编码的内容" autocomplete="off" spellcheck="false">
+          <div class="hint" id="hint-content"></div>
+        </div>
+
+        <div id="extra-fields"></div>
+
+      <button class="generate" id="btn-generate">生成</button>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+      <div class="result" id="result">
+        <div class="preview" id="preview"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const tabs = document.querySelectorAll(".tab");
+  const inputContent = document.getElementById("input-content");
+  const hintContent = document.getElementById("hint-content");
+  const btnGenerate = document.getElementById("btn-generate");
+  const errorMsg = document.getElementById("error-msg");
+  const result = document.getElementById("result");
+  const preview = document.getElementById("preview");
+
+  let currentType = "code128";
+  let lastSvgEl = null;
+  const minimumWidth = 340;
+  const mobileModeQuery = window.matchMedia("(pointer: coarse)");
+  const pcPopupClose = document.getElementById("pc-popup-close");
+  let pcPopupDismissed = false;
+
+  /* ---- Tab switching ---- */
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentType = tab.dataset.type;
+      resetUI();
+      updatePlaceholder();
+    });
+  });
+
+  function updatePlaceholder() {
+    switch (currentType) {
+      case "code128":
+        inputContent.placeholder = "请输入要编码的内容（任意字符）";
+        hintContent.textContent = "支持 ASCII 全部字符，长度不限";
+        break;
+      case "ean13":
+        inputContent.placeholder = "请输入12或13位数字";
+        hintContent.textContent = "EAN-13 需要12位数字（校验位自动生成）或13位完整数字";
+        break;
+      case "qrcode":
+        inputContent.placeholder = "请输入要编码的内容";
+        hintContent.textContent = "支持文字、网址等任意内容";
+        break;
+    }
+  }
+
+  function resetUI() {
+    result.classList.remove("show");
+    errorMsg.classList.remove("show");
+    errorMsg.textContent = "";
+    preview.innerHTML = "";
+    lastSvgEl = null;
+  }
+
+  function updateViewportState() {
+    const isTooSmall = window.innerWidth < minimumWidth;
+    const isMobile = mobileModeQuery.matches && !isTooSmall;
+    const isDesktop = !isMobile && !isTooSmall;
+
+    document.body.classList.toggle("is-too-small", isTooSmall);
+    document.body.classList.toggle("is-mobile", isMobile);
+    document.body.classList.toggle("show-pc-popup", isDesktop && !pcPopupDismissed);
+  }
+
+  /* ---- Generate ---- */
+  btnGenerate.addEventListener("click", generate);
+  inputContent.addEventListener("keydown", e => { if (e.key === "Enter") generate(); });
+  window.addEventListener("resize", updateViewportState);
+  mobileModeQuery.addEventListener("change", updateViewportState);
+  pcPopupClose.addEventListener("click", () => {
+    pcPopupDismissed = true;
+    updateViewportState();
+  });
+
+  function generate() {
+    resetUI();
+    const value = inputContent.value.trim();
+    if (!value) { showError("请输入内容"); return; }
+
+    try {
+      switch (currentType) {
+        case "code128": genCode128(value); break;
+        case "ean13": genEAN13(value); break;
+        case "qrcode": genQR(value); break;
+      }
+      result.classList.add("show");
+    } catch (e) {
+      showError(e.message || "生成失败，请检查输入内容");
+    }
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add("show");
+  }
+
+  /* ---- Code 128 ---- */
+  function genCode128(value) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    JsBarcode(svg, value, {
+      format: "CODE128",
+      width: 2,
+      height: 40,
+      displayValue: true,
+      fontSize: 12,
+      margin: 4,
+      background: "#ffffff",
+      lineColor: "#1a1a2e"
+    });
+    preview.appendChild(svg);
+    lastSvgEl = svg;
+  }
+
+  /* ---- EAN-13 ---- */
+  function genEAN13(value) {
+    if (!/^\d{12,13}$/.test(value)) {
+      throw new Error("EAN-13 需要12位或13位纯数字");
+    }
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    JsBarcode(svg, value, {
+      format: "EAN13",
+      width: 2,
+      height: 40,
+      displayValue: true,
+      fontSize: 12,
+      margin: 4,
+      background: "#ffffff",
+      lineColor: "#1a1a2e"
+    });
+    preview.appendChild(svg);
+    lastSvgEl = svg;
+  }
+
+  /* ---- QR Code ---- */
+  function genQR(value) {
+    const qr = qrcode(0, "M");
+    qr.addData(value);
+    qr.make();
+
+    const modules = qr.getModuleCount();
+    const marginModules = 4;
+    const size = modules + marginModules * 2;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    svg.setAttribute("width", String(size));
+    svg.setAttribute("height", String(size));
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.setAttribute("shape-rendering", "crispEdges");
+    svg.setAttribute("aria-label", "二维码");
+    svg.setAttribute("role", "img");
+
+    const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    background.setAttribute("x", "0");
+    background.setAttribute("y", "0");
+    background.setAttribute("width", String(size));
+    background.setAttribute("height", String(size));
+    background.setAttribute("fill", "#ffffff");
+    svg.appendChild(background);
+
+    for (let r = 0; r < modules; r++) {
+      for (let c = 0; c < modules; c++) {
+        if (qr.isDark(r, c)) {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", String(marginModules + c));
+          rect.setAttribute("y", String(marginModules + r));
+          rect.setAttribute("width", "1");
+          rect.setAttribute("height", "1");
+          rect.setAttribute("fill", "#1a1a2e");
+          svg.appendChild(rect);
+        }
+      }
+    }
+    preview.appendChild(svg);
+    lastSvgEl = svg;
+  }
+
+  /* ---- Init ---- */
+  updatePlaceholder();
+  updateViewportState();
+})();
+</script>
+
+</body>
+</html>
