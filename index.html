@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>条码生成器</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -100,16 +100,6 @@
 
   body.show-pc-popup .pc-popup {
     display: flex;
-  }
-
-  @media (max-width: 339px) {
-    .shell {
-      display: none;
-    }
-
-    .too-small {
-      display: flex;
-    }
   }
 
   h1 {
@@ -280,6 +270,7 @@
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     background: #fff;
     padding: 24px;
     display: flex;
@@ -293,6 +284,7 @@
     align-items: center;
     justify-content: center;
     width: 90vh;
+    width: 90dvh;
     max-width: 1200px;
     transform: rotate(90deg);
     transform-origin: center center;
@@ -452,6 +444,8 @@
   let lastSvgEl = null;
   const minimumWidth = 340;
   const mobileModeQuery = window.matchMedia("(pointer: coarse)");
+  const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const pcPopupClose = document.getElementById("pc-popup-close");
   let pcPopupDismissed = false;
 
@@ -492,8 +486,8 @@
   }
 
   function updateViewportState() {
-    const isTooSmall = window.innerWidth < minimumWidth;
-    const isMobile = mobileModeQuery.matches && !isTooSmall;
+    const isMobile = mobileModeQuery.matches || isIOSDevice;
+    const isTooSmall = !isMobile && window.innerWidth < minimumWidth;
     const isDesktop = !isMobile && !isTooSmall;
 
     document.body.classList.toggle("is-too-small", isTooSmall);
